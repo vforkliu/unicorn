@@ -25,7 +25,7 @@
 
 const int HOOK_MEM_BASE = 0x1000000;
 const int HOOK_MEM_SIZE = 2 * 1024 * 1024;
-const int ADDRESS = HOOK_MEM_BASE + 4;
+const int ADDRESS = 0x1000000 + 4;
 #define HOOK_MAGIC "\x00\x00\x00\x00"
 #define TEST_CODE "\x10\xb5\x4f\xf0\x00\x04\x00\x46\x10\xbd"
 #define TEST_CODE_1 "\x10\xb5\x4f\xf0\x00\x04\x00\x46\x10\xbd"
