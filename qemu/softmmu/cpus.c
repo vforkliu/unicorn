@@ -93,6 +93,7 @@ static int tcg_cpu_exec(struct uc_struct *uc)
         //                  (cpu->singlestep_enabled & SSTEP_NOTIMER) == 0);
         if (cpu_can_run(cpu)) {
             uc->quit_request = false;
+            printf("cpus.tcg_cpu_exec.cpu_exec ...\n");
             r = cpu_exec(uc, cpu);
 
             // quit current TB but continue emulating?
@@ -100,30 +101,30 @@ static int tcg_cpu_exec(struct uc_struct *uc)
                 // reset stop_request
                 uc->stop_request = false;
             } else if (uc->stop_request) {
-                //printf(">>> got STOP request!!!\n");
+                printf(">>> got STOP request!!!\n");
                 finish = true;
                 break;
             }
 
             // save invalid memory access error & quit
             if (uc->invalid_error) {
-                // printf(">>> invalid memory accessed, STOP = %u!!!\n", env->invalid_error);
+                printf(">>> invalid memory accessed, STOP = %u!!!\n", uc->invalid_error);
                 finish = true;
                 break;
             }
 
-            // printf(">>> stop with r = %x, HLT=%x\n", r, EXCP_HLT);
+            printf(">>> stop with r = %x, HLT=%x\n", r, EXCP_HLT);
             if (r == EXCP_DEBUG) {
                 cpu_handle_guest_debug(cpu);
                 break;
             }
             if (r == EXCP_HLT) {
-                //printf(">>> got HLT!!!\n");
+                printf(">>> got HLT!!!\n");
                 finish = true;
                 break;
             }
         } else if (cpu->stop || cpu->stopped) {
-            // printf(">>> got stopped!!!\n");
+            printf(">>> got stopped!!!\n");
             break;
         }
     }
@@ -195,6 +196,7 @@ static inline gboolean uc_exit_invalidate_iter(gpointer key, gpointer val, gpoin
 
 void resume_all_vcpus(struct uc_struct* uc)
 {
+    printf("cpus.resume_all_vcpus ...\n");
     CPUState *cpu = uc->cpu;
     cpu->halted = 0;
     cpu->exit_request = 0;
@@ -203,6 +205,7 @@ void resume_all_vcpus(struct uc_struct* uc)
     /* static void qemu_tcg_cpu_loop(struct uc_struct *uc) */
     cpu->created = true;
     while (true) {
+        printf("cpus.resume_all_vcpus.tcg_cpu_exec ...\n");
         if (tcg_cpu_exec(uc)) {
             break;
         }
@@ -211,10 +214,11 @@ void resume_all_vcpus(struct uc_struct* uc)
     // clear the cache of the exits address, since the generated code
     // at that address is to exit emulation, but not for the instruction there.
     // if we dont do this, next time we cannot emulate at that address
-
+    printf("cpus.resume_all_vcpus.g_tree_foreach ...\n");
     g_tree_foreach(uc->exits, uc_exit_invalidate_iter, (void*)uc);
 
     cpu->created = false;
+    printf("cpus.resume_all_vcpus end.\n");
 }
 
 void vm_start(struct uc_struct* uc)

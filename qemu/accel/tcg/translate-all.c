@@ -1540,6 +1540,7 @@ TranslationBlock *tb_gen_code(CPUState *cpu,
                               target_ulong pc, target_ulong cs_base,
                               uint32_t flags, int cflags)
 {
+    printf("translate-all.tb_gen_code ...\n");
 #ifdef TARGET_ARM
     struct uc_struct *uc = cpu->uc;
 #endif
@@ -1553,7 +1554,9 @@ TranslationBlock *tb_gen_code(CPUState *cpu,
 
     assert_memory_lock();
 #ifdef HAVE_PTHREAD_JIT_PROTECT
-    tb_exec_unlock(false);
+    printf("translate-all.tb_gen_code.tb_exec_unlock ...\n");
+    tb_exec_unlock(tcg_ctx);
+    printf("translate-all.tb_gen_code.tb_exec_unlock end.\n");
 #endif
     phys_pc = get_page_addr_code(env, pc);
 
@@ -2018,8 +2021,11 @@ static bool tb_exec_is_locked(TCGContext *tcg_ctx)
 
 static void tb_exec_change(TCGContext *tcg_ctx, bool locked)
 {
+    printf("tb_exec_change locked:%d, tcg_ctx:%p, ...\n", locked, tcg_ctx);
     jit_write_protect(locked);
+    printf("tb_exec_change.jit_write_protect end.\n");
     tcg_ctx->code_gen_locked = locked;
+    printf("tb_exec_change end.\n");
 }
 #else /* not needed on non-Darwin platforms */
 static bool tb_exec_is_locked(TCGContext *tcg_ctx)
@@ -2033,10 +2039,13 @@ static void tb_exec_change(TCGContext *tcg_ctx, bool locked) {}
 void tb_exec_lock(TCGContext *tcg_ctx)
 {
     /* assumes sys_icache_invalidate already called */
+    printf("tb_exec_lock ...\n");
     tb_exec_change(tcg_ctx, true);
 }
 
 void tb_exec_unlock(TCGContext *tcg_ctx)
 {
+    printf("tb_exec_unlock ...\n");
     tb_exec_change(tcg_ctx, false);
+    printf("tb_exec_unlock end.\n");
 }

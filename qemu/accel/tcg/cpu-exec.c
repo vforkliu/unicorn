@@ -49,6 +49,7 @@ typedef struct SyncClocks {
 /* Execute a TB, and fix up the CPU state afterwards if necessary */
 static inline tcg_target_ulong cpu_tb_exec(CPUState *cpu, TranslationBlock *itb)
 {
+    printf("cpu_tb_exec ...\n");
     CPUArchState *env = cpu->env_ptr;
     uintptr_t ret;
     TranslationBlock *last_tb;
@@ -242,6 +243,7 @@ static inline TranslationBlock *tb_find(CPUState *cpu,
                                         TranslationBlock *last_tb,
                                         int tb_exit, uint32_t cf_mask)
 {
+    printf("cpu-exec.tb_find ...\n");
     TranslationBlock *tb;
     target_ulong cs_base, pc;
     uint32_t flags;
@@ -250,10 +252,13 @@ static inline TranslationBlock *tb_find(CPUState *cpu,
     struct list_item *cur;
     struct hook *hook;
 
+    printf("cpu-exec.tb_find.tb_lookup__cpu_state ...\n");
     tb = tb_lookup__cpu_state(cpu, &pc, &cs_base, &flags, cf_mask);
     if (tb == NULL) {
         mmap_lock();
+        printf("cpu-exec.tb_find.tb_gen_code ...\n");
         tb = tb_gen_code(cpu, pc, cs_base, flags, cf_mask);
+        printf("cpu-exec.tb_find.tb_gen_code end.\n");
         mmap_unlock();
         /* We add the TB in the virtual pc hash table for the fast lookup */
         cpu->tb_jmp_cache[tb_jmp_cache_hash_func(cpu->uc, pc)] = tb;
@@ -267,9 +272,11 @@ static inline TranslationBlock *tb_find(CPUState *cpu,
     }
     /* See if we can patch the calling TB. */
     if (last_tb) {
+        printf("cpu-exec.tb_find.tb_add_jump ...\n");
         tb_add_jump(last_tb, tb_exit, tb);
     }
 
+    printf("cpu-exec.tb_find.UC_TB_COPY ...\n");
     UC_TB_COPY(&cur_tb, tb);
 
     if (last_tb) {
@@ -328,13 +335,17 @@ static inline void cpu_handle_debug_exception(CPUState *cpu)
 
 static inline bool cpu_handle_exception(CPUState *cpu, int *ret)
 {
+    printf("cpu_handle_exception ...\n");
     bool catched = false;
     struct uc_struct *uc = cpu->uc;
     struct hook *hook;
 
-    // printf(">> exception index = %u\n", cpu->exception_index); qq
+    printf(">> exception index = %u\n", cpu->exception_index); //qq
+    printf(">> cpu->uc = %p\n", cpu->uc); //qq
+    printf(">> cpu->uc->stop_interrupt = %p\n", cpu->uc->stop_interrupt); //qq
 
     if (cpu->uc->stop_interrupt && cpu->uc->stop_interrupt(cpu->uc, cpu->exception_index)) {
+        printf("cpu_handle_exception 1...\n");
         // Unicorn: call registered invalid instruction callbacks
         catched = false;
         HOOK_FOREACH_VAR_DECLARE;
@@ -356,11 +367,13 @@ static inline bool cpu_handle_exception(CPUState *cpu, int *ret)
         return true;
     }
 
+    printf("cpu_handle_exception 3...\n");
     if (cpu->exception_index < 0) {
         return false;
     }
 
     if (cpu->exception_index >= EXCP_INTERRUPT) {
+        printf("cpu_handle_exception 2...\n");
         /* exit request from the cpu execution loop */
         *ret = cpu->exception_index;
         if (*ret == EXCP_DEBUG) {
@@ -397,7 +410,7 @@ static inline bool cpu_handle_exception(CPUState *cpu, int *ret)
         }
         // Unicorn: If un-catched interrupt, stop executions.
         if (!catched) {
-            // printf("AAAAAAAAAAAA\n"); qq
+            printf("AAAAAAAAAAAA\n"); //qq
             uc->invalid_error = UC_ERR_EXCEPTION;
             cpu->halted = 1;
             *ret = EXCP_HLT;
@@ -408,6 +421,7 @@ static inline bool cpu_handle_exception(CPUState *cpu, int *ret)
     }
 
     *ret = EXCP_INTERRUPT;
+    printf("cpu_handle_exception end.\n");
     return false;
 }
 
@@ -532,6 +546,7 @@ static inline void cpu_loop_exec_tb(CPUState *cpu, TranslationBlock *tb,
 /* main execution loop */
 int cpu_exec(struct uc_struct *uc, CPUState *cpu)
 {
+    printf("cpu-exec.cpu_exec ...\n");
     CPUClass *cc = CPU_GET_CLASS(cpu);
     int ret;
     // SyncClocks sc = { 0 };
@@ -541,8 +556,9 @@ int cpu_exec(struct uc_struct *uc, CPUState *cpu)
     }
 
     // rcu_read_lock();
-
+    printf("cpu-exec.cpu_exec.cpu_exec_enter ...\n");
     cc->cpu_exec_enter(cpu);
+    printf("cpu-exec.cpu_exec.cpu_exec_enter end.\n");
 
     /* Calculate difference between guest clock and host clock.
      * This delay includes the delay of the last cycle, so
@@ -569,10 +585,12 @@ int cpu_exec(struct uc_struct *uc, CPUState *cpu)
     }
 
     /* if an exception is pending, we execute it here */
+    printf("cpu-exec.cpu_exec.cpu_handle_exception ...\n");
     while (!cpu_handle_exception(cpu, &ret)) {
         TranslationBlock *last_tb = NULL;
         int tb_exit = 0;
 
+        printf("cpu-exec.cpu_exec.cpu_handle_interrupt ...\n");
         while (!cpu_handle_interrupt(cpu, &last_tb)) {
             uint32_t cflags = cpu->cflags_next_tb;
             TranslationBlock *tb;
@@ -588,8 +606,11 @@ int cpu_exec(struct uc_struct *uc, CPUState *cpu)
                 cpu->cflags_next_tb = -1;
             }
 
+            printf("cpu-exec.cpu_exec.tb_find ...\n");
             tb = tb_find(cpu, last_tb, tb_exit, cflags);
+            printf("cpu-exec.cpu_exec.cpu_loop_exec_tb ...\n");
             cpu_loop_exec_tb(cpu, tb, &last_tb, &tb_exit);
+            printf("cpu-exec.cpu_exec.cpu_loop_exec_tb end.\n");
             /* Try to align the host and virtual clocks
                if the guest is in advance */
             // align_clocks(&sc, cpu);
@@ -599,8 +620,10 @@ int cpu_exec(struct uc_struct *uc, CPUState *cpu)
     // Unicorn: Clear any TCG exit flag that might have been left set by exit requests
     uc->cpu->tcg_exit_req = 0;
 
+    printf("cpu-exec.cpu_exec.cpu_exec_exit ...\n");
     cc->cpu_exec_exit(cpu);
     // rcu_read_unlock();
 
+    printf("cpu-exec.cpu_exec end.\n");
     return ret;
 }

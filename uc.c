@@ -690,6 +690,7 @@ UNICORN_EXPORT
 uc_err uc_emu_start(uc_engine *uc, uint64_t begin, uint64_t until,
                     uint64_t timeout, size_t count)
 {
+    printf("uc_emu_start ...\n");
     // reset the counter
     uc->emu_counter = 0;
     uc->invalid_error = UC_ERR_OK;
@@ -801,7 +802,9 @@ uc_err uc_emu_start(uc_engine *uc, uint64_t begin, uint64_t until,
         enable_emu_timer(uc, timeout * 1000); // microseconds -> nanoseconds
     }
 
+    printf("uc_emu_start->vm_start ...\n");
     uc->vm_start(uc);
+    printf("uc_emu_start->vm_start end.\n");
 
     // emulation is done
     uc->emulation_done = true;
@@ -1927,6 +1930,7 @@ static inline gboolean uc_read_exit_iter(gpointer key, gpointer val,
 UNICORN_EXPORT
 uc_err uc_ctl(uc_engine *uc, uc_control_type control, ...)
 {
+    printf("uc_ctl ...\n");
     int rw, type;
     uc_err err = UC_ERR_OK;
     va_list args;
@@ -2124,5 +2128,6 @@ uc_err uc_ctl(uc_engine *uc, uc_control_type control, ...)
 
     va_end(args);
 
+    printf("uc_ctl end.\n");
     return err;
 }
